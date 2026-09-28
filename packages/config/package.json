@@ -1,0 +1,16 @@
+{
+  "name": "@aco/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0",
+    "zod": "^3.23.8"
+  }
+}

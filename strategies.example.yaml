@@ -1,0 +1,68 @@
+# Copy to strategies.yaml and edit. All prices are in the chain's native
+# token (ETH on ethereum/base, POL on polygon, MON on monad, ...).
+#
+# `chain` accepts any OpenSea-supported EVM chain name — ethereum, base,
+# polygon, arbitrum, arbitrum_nova, optimism, avalanche, bsc, blast, zora,
+# sei, ape_chain, abstract, berachain, monad, unichain, ronin, flow_evm,
+# somnia, hyper_evm, soneium, ink, scroll, linea, mantle, taiko, zksync,
+# sonic, world_chain, swellchain, story, gnosis, celo, moonbeam, fantom,
+# cronos, zetachain, boba, klaytn, mint, shape, morph, gravity, b3, gunz,
+# xai, chiliz, cyber, lisk, hemi, redstone, treasure, degen, ham, orderly,
+# superposition, sanko, hychain, arena_z, plume, lumia, form, mode,
+# fraxtal, zircuit, metis, opbnb, manta, kroma, palm, polygon_zkevm,
+# x_layer, xrp_evm, robinhood — plus any viem chain export name (incl.
+# testnets like base_sepolia, robinhood_testnet). Set RPC_<CHAIN> in
+# .env for each chain you use.
+version: 1
+
+# Optional: applied to every strategy, per-key overridable.
+defaults:
+  quantity: 1
+  auto_mint: false
+  max_attempts: 3
+  # Cross-chain minting: pay from this chain instead of the drop's chain.
+  # Robinhood Chain is our home chain — fund the wallet there and the bot
+  # pays on robinhood while the NFT mints on the drop's chain. Remove to
+  # pay natively on each drop's chain. Requires RPC_ROBINHOOD in .env.
+  payment_chain: "robinhood"
+  # payment_token: "0x0000000000000000000000000000000000000000"  # native
+  conditions:
+    require_public_mint: true
+    stop_after_success: true
+
+strategies:
+  - collection: "example-drop"        # OpenSea collection slug
+    chain: "base"
+    quantity: 1
+    max_price: 0.05                   # per-token ceiling, native units
+    auto_mint: true
+    wallet: "default"
+    max_attempts: 3
+    conditions:
+      require_public_mint: true
+      max_gas_fee: 0.01               # per-tx gas ceiling, native units
+      stop_after_success: true
+
+  - collection: "another-drop"
+    chain: "ethereum"
+    quantity: 2
+    max_price: 0.08
+    payment_chain: "robinhood"        # pay on robinhood, mint on ethereum
+    auto_mint: false                  # monitor + notify only
+    conditions:
+      require_public_mint: false
+      allowed_stage_types: ["public_sale", "allowlist"]
+      stop_after_success: true
+
+  # Client wallet pays for their own mint: set PRIVATE_KEY_ALICE in .env
+  # and reference it here. The NFT mints to Alice's address and her key
+  # signs + pays gas — your PRIVATE_KEY is untouched.
+  - collection: "client-drop"
+    chain: "base"
+    quantity: 1
+    max_price: 0.05
+    wallet: "alice"                   # uses PRIVATE_KEY_ALICE from .env
+    auto_mint: true
+    conditions:
+      require_public_mint: true
+      stop_after_success: true

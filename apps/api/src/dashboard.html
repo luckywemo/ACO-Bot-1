@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ACO Bot</title>
+<style>
+  :root {
+    --ink: #090c12;
+    --panel: #10141c;
+    --panel-2: #151a24;
+    --edge: #1d2531;
+    --edge-soft: rgba(29,37,49,.55);
+    --accent: #2081e2;
+    --accent-soft: rgba(32,129,226,.14);
+    --accent-glow: rgba(32,129,226,.4);
+    --slate: #94a3b8;
+    --slate-dim: #5b6b80;
+    --emerald: #34d399;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --text: #e6edf5;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    background:
+      radial-gradient(1000px 500px at 50% -10%, rgba(32,129,226,.08), transparent 60%),
+      var(--ink);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+  main { max-width: 76rem; margin: 0 auto; padding: 1.75rem 1.5rem 3rem; display: flex; flex-direction: column; gap: 1.1rem; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 0.6rem; }
+  h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.01em; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--slate-dim); flex-shrink: 0; }
+  .dot.on { background: var(--emerald); box-shadow: 0 0 8px var(--emerald); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+  .clock { text-align: center; }
+  .clock-time { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 1.2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .clock-date { font-size: 0.72rem; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  .badges { display: flex; align-items: center; gap: 0.5rem; }
+  .badge { border-radius: 999px; padding: 0.2rem 0.65rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; }
+  .badge-ok { background: rgba(52,211,153,.14); color: var(--emerald); }
+  .badge-bad { background: rgba(248,113,113,.14); color: var(--red); }
+  .badge-auto { background: var(--accent-soft); color: var(--accent); font-size: 10px; padding: 0.125rem 0.4rem; margin-left: 0.5rem; }
+  .badge-paused { background: rgba(251,191,36,.14); color: var(--amber); font-size: 10px; padding: 0.125rem 0.4rem; margin-left: 0.25rem; }
+
+  .card {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--edge);
+    border-radius: 1rem; padding: 1.15rem 1.25rem;
+    box-shadow: 0 1px 0 rgba(255,255,255,.02) inset, 0 8px 24px rgba(0,0,0,.25);
+  }
+  .card h2 {
+    font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--slate-dim); margin-bottom: 0.85rem;
+  }
+  .grid2 { display: grid; gap: 1.1rem; }
+  @media (min-width: 768px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+
+  .hero { text-align: center; padding: 1.9rem 1.25rem; position: relative; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(500px 160px at 50% 0%, var(--accent-soft), transparent 70%);
+  }
+  .hero-label { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--slate); }
+  .hero-label .stage-name { color: var(--accent); }
+  .hero-digits {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: clamp(2.6rem, 7vw, 4.2rem); font-weight: 700;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+    margin: 0.45rem 0 0.35rem; text-shadow: 0 0 24px var(--accent-glow);
+  }
+  .hero-digits.live { color: var(--emerald); text-shadow: 0 0 24px rgba(52,211,153,.4); }
+  .hero-target { font-size: 0.85rem; color: var(--slate); }
+  .hero-target .mono { color: var(--text); }
+
+  dl > div { display: flex; justify-content: space-between; padding: 0.2rem 0; }
+  dt { color: var(--slate); }
+  dd { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+  .xs { font-size: 0.75rem; }
+  .dim { color: var(--slate-dim); }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--slate-dim); font-weight: 600; padding-bottom: 0.6rem;
+  }
+  td { padding: 0.6rem 0.25rem 0.6rem 0; border-top: 1px solid var(--edge-soft); vertical-align: middle; }
+  tbody tr { transition: background .12s; }
+  tbody tr:hover { background: rgba(32,129,226,.04); }
+  .empty { text-align: center; color: var(--slate-dim); padding: 1.25rem 0; }
+  button {
+    border-radius: 0.45rem; border: 1px solid var(--edge);
+    background: var(--panel-2); color: var(--text);
+    padding: 0.3rem 0.65rem; font-size: 0.75rem; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+  }
+  button:hover { border-color: var(--slate-dim); background: var(--edge); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.accent { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  button.accent:hover { background: rgba(32,129,226,.25); }
+  button.danger { border-color: rgba(220,38,38,.5); color: var(--red); }
+  button.danger:hover { background: rgba(248,113,113,.1); }
+  button.safe { border-color: rgba(5,150,105,.5); color: var(--emerald); }
+  .row-actions { display: flex; gap: 0.35rem; }
+  .subrow td { background: rgba(10,13,18,.5); border-top-color: var(--edge-soft); font-size: 0.75rem; }
+  .caret { background: none; border: none; padding: 0 0.3rem 0 0; color: var(--slate); font-size: 0.85rem; }
+  .caret:hover { color: var(--text); background: none; }
+  .chip { display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem; border: 1px solid var(--edge); border-radius: 999px; font-size: 0.68rem; color: var(--slate); }
+  .stage-chip { display: inline-block; margin: 0.1rem 0.15rem 0.1rem 0; padding: 0.05rem 0.5rem; border: 1px solid var(--edge); border-radius: 999px; font-size: 0.68rem; color: var(--slate); cursor: help; white-space: nowrap; }
+  .stage-chip.active { border-color: rgba(52,211,153,.55); color: var(--emerald); }
+  .stage-chip.next { border-color: rgba(32,129,226,.55); color: var(--accent); }
+  .clientrow td { background: rgba(10,13,18,.5); }
+  .clientline { display: flex; align-items: center; gap: 0.7rem; padding-left: 1.4rem; flex-wrap: wrap; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; }
+  .card-head h2 { margin-bottom: 0; }
+  #add-form { margin-bottom: 1rem; padding: 0.9rem; border: 1px solid var(--edge); border-radius: 0.75rem; background: rgba(10,13,18,.4); }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem; margin-bottom: 0.75rem; }
+  .form-grid label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: var(--slate); }
+  .form-grid input[type="text"], .form-grid input[type="number"] {
+    background: var(--ink); border: 1px solid var(--edge); border-radius: 0.45rem;
+    padding: 0.4rem 0.55rem; color: var(--text); font-size: 0.8rem; font-family: inherit;
+  }
+  .form-grid input:focus { outline: none; border-color: var(--accent); }
+  .check { flex-direction: row !important; align-items: center; gap: 0.4rem; }
+  .check input { width: auto; accent-color: var(--accent); }
+  /* Multi-wallet picker — pill checkboxes for configured wallets + "all". */
+  .wallet-picks { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.15rem 0 0.4rem; }
+  .wpick { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--text); background: var(--ink); border: 1px solid var(--edge); border-radius: 999px; padding: 0.22rem 0.6rem; cursor: pointer; user-select: none; }
+  .wpick input { accent-color: var(--accent); margin: 0; }
+  .wpick:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .form-foot { display: flex; align-items: center; gap: 0.75rem; }
+  .hidden { display: none; }
+  .updated { font-size: 0.72rem; color: var(--slate-dim); text-align: right; }
+
+  /* Stats strip — headline mint metrics. */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.8rem; }
+  .stat {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--edge); border-radius: 0.85rem; padding: 0.8rem 1rem;
+  }
+  .stat-num { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-num.em { color: var(--emerald); }
+  .stat-num.ac { color: var(--accent); }
+  .stat-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--slate-dim); margin-top: 0.15rem; }
+
+  /* Snipe indicator. */
+  .badge-snipe { background: rgba(251,191,36,.16); color: var(--amber); font-size: 10px; padding: 0.125rem 0.4rem; margin-left: 0.25rem; }
+  .badge-snipe.armed { background: var(--accent-soft); color: var(--accent); }
+  @keyframes snipePulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+  .badge-snipe.live { animation: snipePulse 0.9s infinite; }
+
+  /* Per-wallet P&L chip. */
+  .pnl { font-size: 0.7rem; color: var(--slate); font-variant-numeric: tabular-nums; }
+  .pnl b { color: var(--emerald); font-weight: 600; }
+
+  /* Top nav links between dashboard and drops explorer. */
+  .nav-links { display: flex; gap: 0.4rem; }
+  .nav-links a {
+    color: var(--slate); text-decoration: none; font-size: 0.78rem; font-weight: 600;
+    padding: 0.3rem 0.8rem; border-radius: 999px; border: 1px solid transparent;
+    transition: all .18s;
+  }
+  .nav-links a:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .nav-links a.active { color: var(--accent); background: var(--accent-soft); border-color: rgba(32,129,226,.3); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand">
+      <h1>ACO Bot</h1>
+      <span class="dot" id="live-dot"></span>
+      <div class="nav-links">
+        <a href="/" class="active">Dashboard</a>
+        <a href="/drops">Drops</a>
+      </div>
+    </div>
+    <div class="clock">
+      <div class="clock-time" id="clock-time">--:--:--</div>
+      <div class="clock-date" id="clock-date"></div>
+    </div>
+    <div class="badges">
+      <span id="b-offline" class="badge badge-bad hidden">API offline</span>
+      <span id="b-kill" class="badge hidden"></span>
+      <span id="b-mode" class="badge hidden"></span>
+      <button id="kill-btn" class="hidden"></button>
+    </div>
+  </header>
+
+  <section class="card hero">
+    <div class="hero-label" id="hero-label">next stage</div>
+    <div class="hero-digits" id="hero-digits">--:--:--</div>
+    <div class="hero-target" id="hero-target">waiting for drop data…</div>
+  </section>
+
+  <div class="stats" id="stats-strip">
+    <div class="stat"><div class="stat-num em" id="st-minted">0</div><div class="stat-label">minted</div></div>
+    <div class="stat"><div class="stat-num" id="st-spent">0 ETH</div><div class="stat-label">spent</div></div>
+    <div class="stat"><div class="stat-num ac" id="st-success">—</div><div class="stat-label">success rate</div></div>
+    <div class="stat"><div class="stat-num" id="st-snipes">0</div><div class="stat-label">snipes active</div></div>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Status</h2>
+      <dl id="status-body"><div><dt>connecting…</dt><dd></dd></div></dl>
+    </section>
+    <section class="card">
+      <h2>Latency (avg / p95)</h2>
+      <dl id="latency-body"></dl>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Collections</h2>
+      <button id="add-toggle" class="accent" type="button">+ Add strategy</button>
+    </div>
+    <form id="add-form" class="hidden">
+      <div class="form-grid">
+        <label style="grid-column:1/-1">OpenSea link or slug
+          <input id="f-collection" type="text" required placeholder="https://opensea.io/collection/…">
+        </label>
+        <label style="grid-column:1/-1">Client private key — registers the named wallet
+          <input id="f-key" type="password" placeholder="0x… (only for a new client wallet)" autocomplete="off">
+        </label>
+        <label>Quantity<input id="f-quantity" type="number" min="1" value="1"></label>
+        <label>Max price (ETH)<input id="f-maxprice" type="text" placeholder="auto — 120% of stage"></label>
+        <label style="grid-column:1/-1"><span id="f-wallet-label">Wallets — pick one or more, or "all"</span>
+          <div id="f-wallet-picks" class="wallet-picks"></div>
+          <input id="f-wallet" type="text" placeholder="or type a new client wallet name">
+        </label>
+        <label>Payment chain<input id="f-paychain" type="text" placeholder="same as drop"></label>
+        <label class="check"><input id="f-automint" type="checkbox" checked> auto-mint when live</label>
+        <label class="check"><input id="f-public" type="checkbox" checked> public stage only</label>
+        <label class="check"><input id="f-stop" type="checkbox" checked> stop after success</label>
+        <label class="check"><input id="f-mintmax" type="checkbox"> mint max per wallet</label>
+      </div>
+      <div class="form-foot">
+        <button type="submit" class="accent">Arm strategy</button>
+        <span id="add-msg" class="xs"></span>
+      </div>
+    </form>
+    <table>
+      <thead><tr>
+        <th>Collection</th><th>Chain</th><th>Status</th><th>Stage</th>
+        <th>Price</th><th>Minted</th><th>Starts in</th><th>Eligibility</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="collections-body">
+        <tr><td colspan="9" class="empty">no strategies loaded</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Recent attempts</h2>
+    <table>
+      <thead><tr>
+        <th>Collection</th><th>Status</th><th>Reason</th>
+        <th>Total</th><th>TX</th><th>Time</th>
+      </tr></thead>
+      <tbody id="attempts-body">
+        <tr><td colspan="6" class="empty">no attempts yet</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="updated" id="updated"></div>
+</main>
+
+<script>
+"use strict";
+// This page only works when served by the bot's API server. If it was
+// opened as a file (IDE preview, double-click), fetches have no server.
+if (location.protocol === "file:") {
+  document.querySelector("main").innerHTML =
+    '<section class="card"><h2>Wrong URL</h2>' +
+    '<p style="color:var(--slate)">This dashboard is served by the bot itself. ' +
+    'Open <a href="http://localhost:4000" style="color:var(--accent)">http://localhost:4000</a> ' +
+    "in your browser — don't open the HTML file directly.</p></section>";
+  throw new Error("dashboard opened via file:// — use http://localhost:4000");
+}
+// Same-origin fetches — this page is served by the bot's own API server,
+// so there is no cross-origin or port mismatch possible.
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const fmtMs = (v) => (v === undefined || v === null ? "—" : Math.round(v) + " ms");
+const fmtEth = (wei) => {
+  const n = Number(wei);
+  return Number.isFinite(n) ? (n / 1e18).toFixed(4) + " ETH" : wei + " wei";
+};
+const badge = (ok, label) =>
+  `<span class="badge ${ok ? "badge-ok" : "badge-bad"}">${esc(label)}</span>`;
+const pad = (n) => String(n).padStart(2, "0");
+const fmtCountdown = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+    m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (d > 0 ? d + "d " : "") + pad(h) + ":" + pad(m) + ":" + pad(sec);
+};
+let countdownTarget = null; // { at, label, name } — soonest upcoming stage
+let lastOk = 0;             // last successful poll, for "updated Xs ago"
+
+async function get(path) {
+  const res = await fetch(path, { cache: "no-store" });
+  if (!res.ok) throw new Error(path + " -> " + res.status);
+  return res.json();
+}
+async function post(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = res.status;
+    try { detail = (await res.json()).error ?? res.status; } catch { /* keep status */ }
+    throw new Error(String(detail));
+  }
+  return res.json();
+}
+
+const state = {
+  status: undefined,
+  strategies: [],
+  drops: [],
+  attempts: [],
+  latency: undefined,
+  elig: {},          // slug -> "loading" | dto
+  eligRequested: new Set(),
+  mint: {},          // collection::wallet -> "running" | attempt
+  rowBusy: {},
+  collapsed: new Set(), // collections whose client rows are hidden
+  killBusy: false,
+};
+
+const snap = (slug) => state.drops.find((d) => d.slug === slug);
+const skey = (collection, wallet) => `${collection}::${wallet}`;
+const monitored = (collection, wallet) =>
+  state.status && state.status.monitored.find((m) =>
+    m.collection === collection && (wallet === undefined || m.wallet === wallet));
+
+async function tick() {
+  try {
+    const [s, st, d, a, l] = await Promise.all([
+      get("/api/status"),
+      get("/api/strategies"),
+      get("/api/drops"),
+      get("/api/attempts?limit=50"),
+      get("/api/metrics/latency"),
+    ]);
+    Object.assign(state, { status: s, strategies: st, drops: d, attempts: a, latency: l });
+    lastOk = Date.now();
+    pickCountdown();
+    render();
+    renderWalletPicks();
+    // Auto-check eligibility once per collection.
+    for (const strat of st) {
+      if (!state.eligRequested.has(strat.collection)) {
+        state.eligRequested.add(strat.collection);
+        void checkEligibility(strat.collection);
+      }
+    }
+  } catch {
+    $("b-offline").classList.remove("hidden");
+    $("live-dot").classList.remove("on");
+  }
+}
+
+async function checkEligibility(slug, attempt = 0) {
+  state.elig[slug] = "loading";
+  renderCollections();
+  try {
+    const res = await get("/api/eligibility/" + encodeURIComponent(slug));
+    state.elig[slug] = res;
+    // A transient SIWE/429 failure leaves stages:null on some wallets —
+    // retry a few times so badges don't stick on "elig n/a".
+    const pending = (res.wallets || []).some((w) => w.stages == null);
+    if (pending && attempt < 3) {
+      setTimeout(() => void checkEligibility(slug, attempt + 1), 15_000);
+    }
+  } catch (e) {
+    state.elig[slug] = { collection: slug, stages: null, reason: String(e && e.message || e) };
+    if (attempt < 3) {
+      setTimeout(() => void checkEligibility(slug, attempt + 1), 15_000);
+    }
+  }
+  renderCollections();
+}
+
+async function mintNow(slug, wallet) {
+  const key = skey(slug, wallet);
+  if (
+    state.status && !state.status.dry_run &&
+    !window.confirm(`DRY_RUN is off — this broadcasts a REAL mint for "${slug}" (${wallet}). Continue?`)
+  ) return;
+  state.mint[key] = "running";
+  renderCollections();
+  try {
+    state.mint[key] = await post("/api/mint/trigger", { collection: slug, wallet });
+  } catch (e) {
+    state.mint[key] = {
+      id: "", collection: slug, chain: "", status: "error",
+      reason: String(e && e.message || e), quantity: 0, priceWei: "0",
+      createdAt: Date.now(),
+    };
+  }
+  renderCollections();
+}
+
+async function togglePause(slug, paused) {
+  state.rowBusy[slug] = true;
+  renderCollections();
+  try {
+    await post(`/api/monitor/${encodeURIComponent(slug)}/${paused ? "resume" : "pause"}`);
+  } finally {
+    state.rowBusy[slug] = false;
+    void tick();
+  }
+}
+
+function toggleDrop(slug) {
+  if (state.collapsed.has(slug)) state.collapsed.delete(slug);
+  else state.collapsed.add(slug);
+  renderCollections();
+}
+
+// Open the add form with the drop pre-filled — adding a client to an
+// existing drop is just arming the same collection with a new wallet.
+function prefillClient(slug) {
+  $("add-form").classList.remove("hidden");
+  $("f-collection").value = slug;
+  // Adding a client needs a distinct wallet name — blank would default to
+  // "default" (your own wallet) and collide. Single wallet → hide the picker.
+  $("f-wallet-picks").classList.add("hidden");
+  $("f-wallet").required = true;
+  $("f-wallet").placeholder = "client name — required";
+  $("f-wallet-label").textContent = "Client wallet name — required";
+  $("f-wallet").focus();
+}
+
+async function removeStrategy(slug, wallet) {
+  if (!confirm(`Remove client "${wallet}" from "${slug}"? This disarms it and deletes it from strategies.yaml.`)) return;
+  const key = skey(slug, wallet);
+  state.rowBusy[key] = true;
+  renderCollections();
+  try {
+    const res = await fetch(`/api/strategies/${encodeURIComponent(slug)}/${encodeURIComponent(wallet)}`, { method: "DELETE" });
+    if (!res.ok) {
+      let detail = res.status;
+      try { detail = (await res.json()).error ?? res.status; } catch { /* keep status */ }
+      alert(`remove failed: ${detail}`);
+    }
+  } finally {
+    state.rowBusy[key] = false;
+    void tick();
+  }
+}
+
+async function toggleKill() {
+  if (state.killBusy) return;
+  state.killBusy = true;
+  try {
+    await post(state.status && state.status.kill_switch ? "/api/kill/release" : "/api/kill");
+  } finally {
+    state.killBusy = false;
+    void tick();
+  }
+}
+
+function render() {
+  const s = state.status;
+  $("b-offline").classList.add("hidden");
+  $("live-dot").classList.add("on");
+
+  const kill = $("b-kill"), mode = $("b-mode"), kb = $("kill-btn");
+  kill.classList.remove("hidden");
+  kill.className = "badge " + (s.kill_switch ? "badge-bad" : "badge-ok");
+  kill.textContent = s.kill_switch ? "KILL SWITCH" : "live";
+  mode.classList.remove("hidden");
+  mode.className = "badge " + (s.dry_run ? "badge-ok" : "badge-bad");
+  mode.textContent = s.dry_run ? "dry-run" : "REAL TX";
+  kb.classList.remove("hidden");
+  kb.className = s.kill_switch ? "safe" : "danger";
+  kb.textContent = s.kill_switch ? "Release kill switch" : "Kill switch";
+  kb.disabled = state.killBusy;
+
+  $("status-body").innerHTML = [
+    ["Uptime", Math.round(s.uptime_ms / 1000) + "s"],
+    ["Wallet", `<span class="mono xs">${esc(s.wallet ?? "—")}</span>`],
+    ["Signer", s.signer_configured ? "configured" : "not configured"],
+    ["Strategies", s.strategies],
+  ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+
+  const lat = state.latency;
+  const rows = ["detection_ms", "tx_build_ms", "signing_ms", "broadcast_ms", "confirmation_ms", "total_ms"]
+    .map((k) => {
+      const label = k.replace("_ms", "").replace("_", " ");
+      const avg = lat && lat.attempts.avg[k], p95 = lat && lat.attempts.p95[k];
+      return `<div><dt>${label}</dt><dd class="mono">${fmtMs(avg)} / ${fmtMs(p95)}</dd></div>`;
+    }).join("");
+  const apiAvg = lat && lat.opensea_api.avg_ms, apiP95 = lat && lat.opensea_api.p95_ms;
+  $("latency-body").innerHTML = rows +
+    `<div style="border-top:1px solid var(--edge);padding-top:0.25rem"><dt>OpenSea API</dt><dd class="mono">${fmtMs(apiAvg)} / ${fmtMs(apiP95)}</dd></div>`;
+
+  renderStats();
+  renderCollections();
+  renderAttempts();
+}
+
+// Headline mint metrics from the attempt log.
+function renderStats() {
+  const att = state.attempts || [];
+  const conf = att.filter((a) => a.status === "confirmed" || a.status === "dry_run");
+  const minted = conf.reduce((n, a) => n + (a.quantity || 0), 0);
+  const spent = conf.reduce((n, a) => n + Number(a.priceWei || 0) * (a.quantity || 0), 0);
+  const terminal = att.filter((a) =>
+    ["confirmed", "dry_run", "failed", "skipped"].includes(a.status)).length;
+  const rate = terminal ? Math.round((conf.length / terminal) * 100) + "%" : "—";
+  const snipes = ((state.status && state.status.monitored) || [])
+    .filter((m) => m.sniping).length;
+  $("st-minted").textContent = minted;
+  $("st-spent").textContent = (spent / 1e18).toFixed(4) + " ETH";
+  $("st-success").textContent = rate;
+  $("st-snipes").textContent = snipes;
+}
+
+// Per-wallet P&L — minted count + total spent for this client's address.
+function walletStats(collection, addr) {
+  if (!addr) return "";
+  const att = (state.attempts || []).filter((a) =>
+    a.collection === collection && a.wallet &&
+    a.wallet.toLowerCase() === addr.toLowerCase());
+  if (!att.length) return "";
+  const conf = att.filter((a) => a.status === "confirmed" || a.status === "dry_run");
+  const minted = conf.reduce((n, a) => n + (a.quantity || 0), 0);
+  const spent = conf.reduce((n, a) => n + Number(a.priceWei || 0) * (a.quantity || 0), 0);
+  return `<span class="pnl" title="${conf.length} confirmed / ${att.length} attempts"><b>${minted}</b> minted · ${(spent / 1e18).toFixed(3)} ETH</span>`;
+}
+
+// Map a stage_uuid to a readable stage name via the drop snapshot. The
+// normalized stage uses `type` (lowercased stage_type) and `label`; the uuid
+// may live on the stages array, activeStage, or nextStage.
+function stageName(slug, uuid) {
+  const d = snap(slug);
+  if (!d || !uuid) return "stage";
+  // Snapshot stores uuid without dashes; eligibility returns it dashed.
+  const norm = (u) => String(u || "").replace(/-/g, "").toLowerCase();
+  const want = norm(uuid);
+  const all = [...(d.stages || []), d.activeStage, d.nextStage].filter(Boolean);
+  const st = all.find((s) => norm(s.uuid) === want);
+  if (!st) return "stage";
+  const nm = st.label || (st.type ? String(st.type).replace(/_/g, " ") : "");
+  return nm || "stage";
+}
+
+// Per-client eligibility badges — real per-stage is_eligible for this wallet.
+function clientElig(slug, wallet) {
+  const e = state.elig[slug];
+  if (e === "loading") return `<span class="xs dim">checking…</span>`;
+  const w = e && e.wallets && e.wallets.find((x) => x.wallet === wallet);
+  if (!w) return "";
+  if (w.stages === null || w.stages === undefined) {
+    return `<span class="xs dim" title="${esc(w.error || "wallet couldn't authenticate")}">elig n/a</span>`;
+  }
+  if (!w.stages.length) return `<span class="xs dim">no stages</span>`;
+  return w.stages
+    .map((st) =>
+      badge(
+        st.is_eligible,
+        `${esc(stageName(slug, st.stage_uuid))}: ${st.is_eligible ? "✓" : st.rejected ? "✗ rejected" : "✗"}`,
+      ),
+    )
+    .join(" ");
+}
+
+function eligCell(slug) {
+  const e = state.elig[slug];
+  if (e === "loading") return `<span class="xs dim">checking…</span>`;
+  if (e && e.wallets) {
+    // Summarize across clients — how many can mint at least one stage.
+    const ok = e.wallets.filter(
+      (w) => w.stages && w.stages.some((st) => st.is_eligible),
+    ).length;
+    const total = e.wallets.length;
+    if (!total) return `<span class="xs dim">—</span>`;
+    return `<span class="xs ${ok ? "" : "dim"}" style="${ok ? "color:var(--emerald)" : ""}">${ok}/${total} eligible</span>`;
+  }
+  if (e) {
+    const d = snap(slug);
+    const st =
+      (d && d.activeStage && d.activeStage.type + " " + (d.activeStage.label ?? "")) ||
+      (d && d.nextStage && d.nextStage.type + " " + (d.nextStage.label ?? "")) || "";
+    const open = /public|open/i.test(st);
+    return open
+      ? `<span class="xs" style="color:var(--emerald)">open to all</span>`
+      : `<span class="xs dim" title="verified at mint — the build endpoint rejects ineligible wallets">allowlist · checked at mint</span>`;
+  }
+  return `<button onclick="checkEligibility('${esc(slug)}')">Check</button>`;
+}
+
+// Mint progress — total_supply (minted) / max_supply (allocation). Color
+// shifts emerald → amber near the cap → red when sold out.
+function mintedCell(d) {
+  if (!d || (d.totalSupply === undefined && d.maxSupply === undefined)) {
+    return `<span class="dim">—</span>`;
+  }
+  const minted = d.totalSupply;
+  const max = d.maxSupply;
+  if (minted !== undefined && max !== undefined) {
+    const left = Math.max(0, max - minted);
+    const pct = max ? Math.round((minted / max) * 100) : 0;
+    const color = left === 0 ? "var(--red)" : pct >= 90 ? "var(--amber)" : "var(--emerald)";
+    return `<span class="mono" style="color:${color}" title="${left} remaining · ${pct}% minted">${minted}/${max}</span>`;
+  }
+  const txt = (minted !== undefined ? minted : "?") + (max !== undefined ? "/" + max : "");
+  return `<span class="mono">${esc(txt)}</span>`;
+}
+
+// Render every phase as a hoverable chip. Tooltip shows the phase's
+// allocation: whitelisted wallet count (or "open to all"), per-wallet and
+// per-stage caps, price, and the start→end window.
+function stageChips(d) {
+  if (!d) return "—";
+  const list = (d.stages && d.stages.length
+    ? d.stages
+    : [d.activeStage, d.nextStage]).filter(Boolean);
+  if (!list.length) return "—";
+  const norm = (u) => String(u || "").replace(/-/g, "").toLowerCase();
+  const activeUuid = d.activeStage && norm(d.activeStage.uuid);
+  const nextUuid = d.nextStage && norm(d.nextStage.uuid);
+  const fmtT = (t) => (t === undefined ? "?" : new Date(t).toLocaleString());
+  return list.map((st) => {
+    const nm = st.label || (st.type ? String(st.type).replace(/_/g, " ") : "stage");
+    const isActive = activeUuid && norm(st.uuid) === activeUuid;
+    const isNext = !isActive && nextUuid && norm(st.uuid) === nextUuid;
+    const alloc = st.allowlistWalletCount > 0
+      ? `${st.allowlistWalletCount} wallet${st.allowlistWalletCount === 1 ? "" : "s"} allocated`
+      : "open to all";
+    const tip = [
+      nm + (st.type ? ` (${st.type})` : ""),
+      alloc,
+      st.maxPerWallet !== undefined ? `max ${st.maxPerWallet} per wallet` : null,
+      st.maxPerStage !== undefined ? `stage cap ${st.maxPerStage}` : null,
+      st.priceWei !== undefined ? `price ${fmtEth(st.priceWei)}` : null,
+      st.startTime !== undefined || st.endTime !== undefined
+        ? `${fmtT(st.startTime)} → ${fmtT(st.endTime)}` : null,
+    ].filter(Boolean).join("\n");
+    const cls = isActive ? "stage-chip active" : isNext ? "stage-chip next" : "stage-chip";
+    return `<span class="${cls}" title="${esc(tip)}">${esc(nm)}</span>`;
+  }).join("");
+}
+
+function renderCollections() {
+  const body = $("collections-body");
+  if (!state.strategies.length) {
+    body.innerHTML = `<tr><td colspan="9" class="empty">no strategies loaded</td></tr>`;
+    return;
+  }
+  // Group client strategies by collection — one drop row that expands
+  // to show each client (wallet) minting it.
+  const groups = new Map();
+  for (const s of state.strategies) {
+    if (!groups.has(s.collection)) groups.set(s.collection, []);
+    groups.get(s.collection).push(s);
+  }
+  let out = "";
+  for (const [collection, clients] of groups) {
+    const d = snap(collection);
+    const mon0 = monitored(collection, clients[0].wallet);
+    const paused = mon0 ? mon0.paused : false;
+    const price = d && d.activeStage ? fmtEth(d.activeStage.priceWei) : "—";
+    const startsIn = d && d.nextStage && d.nextStage.startTime !== undefined
+      ? fmtCountdown(d.nextStage.startTime - Date.now()) : "—";
+    const open = !state.collapsed.has(collection);
+    out += `<tr>
+      <td>
+        <button class="caret" onclick="toggleDrop('${esc(collection)}')" title="${open ? "collapse" : "expand"}">${open ? "▾" : "▸"}</button>
+        <span style="font-weight:500">${esc(d && d.name || collection)}</span>
+        <span class="chip">${clients.length} client${clients.length === 1 ? "" : "s"}</span>
+      </td>
+      <td>${esc(clients[0].chain)}${clients[0].payment_chain ? ` <span class="dim">← ${esc(clients[0].payment_chain)}</span>` : ""}</td>
+      <td>${d ? badge(d.status === "live", d.status) : "—"}${paused ? '<span class="badge badge-paused">paused</span>' : ""}</td>
+      <td>${stageChips(d)}</td>
+      <td class="mono">${esc(price)}</td>
+      <td>${mintedCell(d)}</td>
+      <td class="mono">${startsIn}</td>
+      <td>${eligCell(collection)}</td>
+      <td><div class="row-actions">
+        <button ${state.rowBusy[collection] ? "disabled" : ""} onclick="togglePause('${esc(collection)}', ${paused})">${paused ? "Resume" : "Pause"}</button>
+        <button class="accent" onclick="prefillClient('${esc(collection)}')">+ client</button>
+      </div></td>
+    </tr>`;
+    if (open) {
+      for (const s of clients) {
+        const key = skey(s.collection, s.wallet);
+        const mon = monitored(s.collection, s.wallet);
+        const m = state.mint[key];
+        const rule = s.conditions && s.conditions.require_public_mint ? "public only" : "any stage";
+        const addr = mon && mon.address;
+        const mine = addr && state.status && state.status.wallet &&
+          addr.toLowerCase() === state.status.wallet.toLowerCase();
+        // Snipe state — in-flight now, or armed (next stage inside arm window).
+        const armMs = state.status && state.status.sniper_arm_ms;
+        const untilStart = d && d.nextStage && d.nextStage.startTime !== undefined
+          ? d.nextStage.startTime - Date.now() : Infinity;
+        const sniping = mon && mon.sniping;
+        const armed = !sniping && s.auto_mint && armMs !== undefined &&
+          untilStart > 0 && untilStart <= armMs;
+        out += `<tr class="subrow clientrow"><td colspan="9">
+          <div class="clientline">
+            <span class="mono" style="font-weight:600">${esc(s.wallet)}</span>
+            ${mine ? '<span class="badge badge-ok">you</span>' : ""}
+            ${addr ? `<span class="mono dim xs" title="${esc(addr)}">${esc(addr.slice(0, 6))}…${esc(addr.slice(-4))}</span>` : '<span class="dim xs">no key</span>'}
+            <span class="dim">×${esc(String(s.quantity))}</span>
+            <span class="chip">${esc(rule)}</span>
+            ${s.auto_mint ? '<span class="badge badge-auto">auto</span>' : ""}
+            ${sniping ? '<span class="badge badge-snipe live">⚡ sniping</span>' : armed ? '<span class="badge badge-snipe armed">⚡ armed</span>' : ""}
+            ${clientElig(s.collection, s.wallet)}
+            ${walletStats(s.collection, addr)}
+            ${mon && mon.done ? '<span class="badge badge-ok">done</span>' : ""}
+            ${m === "running" ? '<span class="xs dim">minting…</span>' : ""}
+            ${m && m !== "running" ? badge(m.status === "confirmed" || m.status === "dry_run", m.status) : ""}
+            ${m && m !== "running" && m.reason ? `<span class="dim xs">${esc(m.reason)}</span>` : ""}
+            ${m && m !== "running" && m.txHash ? `<span class="mono dim xs">${esc(m.txHash.slice(0, 12))}…</span>` : ""}
+            <span class="row-actions" style="margin-left:auto">
+              <button class="accent" ${m === "running" ? "disabled" : ""} onclick="mintNow('${esc(s.collection)}','${esc(s.wallet)}')">Mint now</button>
+              <button class="danger" ${state.rowBusy[key] ? "disabled" : ""} onclick="removeStrategy('${esc(s.collection)}','${esc(s.wallet)}')">Remove</button>
+            </span>
+          </div>
+        </td></tr>`;
+      }
+    }
+  }
+  body.innerHTML = out;
+}
+
+function renderAttempts() {
+  const body = $("attempts-body");
+  if (!state.attempts.length) {
+    body.innerHTML = `<tr><td colspan="6" class="empty">no attempts yet</td></tr>`;
+    return;
+  }
+  body.innerHTML = state.attempts.map((a) => `<tr>
+    <td>${esc(a.collection)}</td>
+    <td>${badge(a.status === "confirmed" || a.status === "dry_run", a.status)}</td>
+    <td class="dim">${esc(a.reason ?? "—")}</td>
+    <td class="mono">${fmtMs(a.latencies && a.latencies.total_ms)}</td>
+    <td class="mono xs">${a.txHash ? esc(a.txHash.slice(0, 10)) + "…" : "—"}</td>
+    <td class="dim">${new Date(a.createdAt).toLocaleTimeString()}</td>
+  </tr>`).join("");
+}
+
+function pickCountdown() {
+  let best = null;
+  for (const d of state.drops) {
+    const ns = d.nextStage;
+    if (ns && ns.startTime !== undefined && (!best || ns.startTime < best.at)) {
+      best = { at: ns.startTime, label: ns.label || ns.type || "next stage", name: d.name || d.slug };
+    }
+  }
+  countdownTarget = best;
+}
+
+// 1s local tick — clock, countdown digits, and "updated Xs ago" stay
+// smooth between the 2s API polls.
+function tickClock() {
+  const now = new Date();
+  $("clock-time").textContent = now.toLocaleTimeString();
+  $("clock-date").textContent = now.toLocaleDateString(undefined, {
+    weekday: "short", month: "short", day: "numeric", year: "numeric",
+  });
+  const digits = $("hero-digits"), label = $("hero-label"), target = $("hero-target");
+  if (countdownTarget) {
+    const ms = countdownTarget.at - Date.now();
+    if (ms > 0) {
+      label.innerHTML = `next stage · <span class="stage-name">${esc(countdownTarget.label)}</span>`;
+      digits.classList.remove("live");
+      digits.textContent = fmtCountdown(ms);
+      target.innerHTML = `${esc(countdownTarget.name)} — starts <span class="mono">${new Date(countdownTarget.at).toLocaleString()}</span>`;
+    } else {
+      label.innerHTML = `<span class="stage-name">${esc(countdownTarget.label)}</span> is starting`;
+      digits.classList.add("live");
+      digits.textContent = "LIVE";
+      target.textContent = "transition in progress — monitor is polling";
+    }
+  } else {
+    const live = state.drops.find((d) => d.status === "live");
+    if (live) {
+      label.innerHTML = `<span class="stage-name">${esc(live.name || live.slug)}</span>`;
+      digits.classList.add("live");
+      digits.textContent = "LIVE NOW";
+      target.textContent = live.activeStage ? "stage: " + (live.activeStage.label || live.activeStage.type) : "";
+    } else {
+      label.textContent = "next stage";
+      digits.classList.remove("live");
+      digits.textContent = "—";
+      target.textContent = state.drops.length ? "no upcoming stage scheduled" : "waiting for drop data…";
+    }
+  }
+  $("updated").textContent = lastOk
+    ? "last update " + Math.max(0, Math.round((Date.now() - lastOk) / 1000)) + "s ago"
+    : "";
+}
+
+// Wallet picker — one chip per configured wallet + an "all" master toggle.
+// Re-renders only when the wallet list changes so the 2s tick doesn't
+// clobber in-progress selections.
+let walletPicksFor = "";
+function renderWalletPicks() {
+  const box = $("f-wallet-picks");
+  if (!box) return;
+  const names = (state.status && state.status.wallets) || [];
+  const sig = names.join(",");
+  if (sig === walletPicksFor) return;
+  walletPicksFor = sig;
+  box.innerHTML =
+    `<label class="wpick"><input type="checkbox" id="f-wallet-all"> all</label>` +
+    names.map((n) =>
+      `<label class="wpick"><input type="checkbox" class="f-wallet-name" value="${esc(n)}"> ${esc(n)}</label>`
+    ).join("");
+  const all = $("f-wallet-all");
+  const boxes = [...box.querySelectorAll(".f-wallet-name")];
+  all.addEventListener("change", () =>
+    boxes.forEach((c) => (c.checked = all.checked)));
+  boxes.forEach((c) =>
+    c.addEventListener("change", () => {
+      all.checked = boxes.every((b) => b.checked);
+    }));
+}
+
+$("add-toggle").addEventListener("click", () => {
+  $("add-form").classList.toggle("hidden");
+  // normal-add mode — multi-wallet picker visible, custom name optional
+  $("f-wallet-picks").classList.remove("hidden");
+  $("f-wallet").required = false;
+  $("f-wallet").placeholder = "or type a new client wallet name";
+  $("f-wallet-label").textContent = 'Wallets — pick one or more, or "all"';
+  renderWalletPicks();
+});
+$("add-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("add-msg");
+  msg.style.color = "var(--slate)";
+  msg.textContent = "arming…";
+  try {
+    // A typed name wins (new client wallet); else the checked picks →
+    // "all" or a list of wallet names.
+    const typedWallet = $("f-wallet").value.trim();
+    let wallet;
+    if (typedWallet) {
+      wallet = typedWallet;
+    } else {
+      const picks = [...document.querySelectorAll(".f-wallet-name:checked")]
+        .map((c) => c.value);
+      wallet = $("f-wallet-all") && $("f-wallet-all").checked
+        ? "all"
+        : picks.length > 1 ? picks : picks[0] || undefined;
+    }
+    const res = await post("/api/strategies", {
+      collection: $("f-collection").value,
+      quantity: Number($("f-quantity").value) || 1,
+      max_price: $("f-maxprice").value || undefined,
+      wallet,
+      private_key: $("f-key").value || undefined,
+      payment_chain: $("f-paychain").value || undefined,
+      auto_mint: $("f-automint").checked,
+      require_public_mint: $("f-public").checked,
+      stop_after_success: $("f-stop").checked,
+      mint_max: $("f-mintmax").checked,
+    });
+    msg.style.color = "var(--emerald)";
+    msg.textContent = `armed ✓ ${res.strategy.collection}` +
+      (res.count > 1 ? ` ×${res.count} wallets` : ` · ${res.strategy.wallet}`) +
+      (res.persisted ? " · saved" : " · runtime only") +
+      (res.keyPersisted ? ` · wallet "${res.strategy.wallet}" saved to .env` : "") +
+      (res.skipped && res.skipped.length ? ` · skipped ${res.skipped.join(",")} (already armed)` : "");
+    e.target.reset();
+    $("f-automint").checked = $("f-public").checked = $("f-stop").checked = true;
+    $("f-quantity").value = 1;
+    void tick();
+  } catch (err) {
+    msg.style.color = "var(--red)";
+    msg.textContent = String(err && err.message || err);
+  }
+});
+
+$("kill-btn").addEventListener("click", () => void toggleKill());
+void tick();
+tickClock();
+setInterval(tick, 2000);
+setInterval(tickClock, 1000);
+</script>
+</body>
+</html>

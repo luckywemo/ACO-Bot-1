@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ACO — Drops Terminal</title>
+<style>
+  :root {
+    --ink: #090c12;
+    --panel: #0e1219;
+    --panel-2: #121722;
+    --edge: #1d2531;
+    --edge-soft: rgba(29,37,49,.55);
+    --accent: #2081e2;
+    --accent-soft: rgba(32,129,226,.14);
+    --gold: #f0b90b;
+    --slate: #94a3b8;
+    --slate-dim: #5b6b80;
+    --emerald: #34d399;
+    --red: #f87171;
+    --text: #e6edf5;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    background: radial-gradient(1100px 480px at 50% -14%, rgba(32,129,226,.08), transparent 60%), var(--ink);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 13px; min-height: 100vh;
+  }
+  ::selection { background: var(--accent-soft); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ── Top bar ─────────────────────────────────────────── */
+  header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: .7rem;
+    padding: .55rem .9rem;
+    background: rgba(9,12,18,.85); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--edge-soft);
+  }
+  .brand { display: flex; align-items: center; gap: .45rem; font-weight: 800; font-size: .95rem; letter-spacing: -.01em; white-space: nowrap; }
+  .brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 8px var(--emerald); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+  .brand span { color: var(--slate-dim); font-weight: 600; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+  .navbtn {
+    color: var(--slate); background: none; border: 1px solid var(--edge);
+    border-radius: 8px; padding: .32rem .7rem; font-size: .75rem; font-weight: 600;
+    cursor: pointer; white-space: nowrap; transition: all .15s; text-decoration: none;
+    display: inline-flex; align-items: center; gap: .35rem;
+  }
+  .navbtn:hover { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+  .navbtn.hot { color: var(--accent); border-color: rgba(32,129,226,.4); }
+
+  /* search */
+  .search { position: relative; flex: 1; max-width: 30rem; }
+  .search input {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--edge);
+    color: var(--text); border-radius: 8px; padding: .42rem .8rem .42rem 1.9rem;
+    font-size: .8rem; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search::before { content: "⌕"; position: absolute; left: .65rem; top: 50%; transform: translateY(-52%); color: var(--slate-dim); font-size: 1rem; }
+  .search-results {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
+    background: var(--panel-2); border: 1px solid var(--edge); border-radius: 10px;
+    overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,.6); display: none;
+  }
+  .search-results.open { display: block; animation: drop .16s cubic-bezier(.2,.8,.25,1); }
+  @keyframes drop { from { opacity: 0; transform: translateY(-6px); } }
+  .sr-row { display: flex; align-items: center; gap: .55rem; padding: .45rem .7rem; cursor: pointer; transition: background .12s; }
+  .sr-row:hover { background: rgba(255,255,255,.05); }
+  .sr-name { font-weight: 600; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sr-sub { font-size: .65rem; color: var(--slate-dim); font-family: var(--mono); }
+  .sr-empty { padding: .8rem; text-align: center; color: var(--slate-dim); font-size: .75rem; }
+
+  /* chain pills */
+  .chains { display: flex; gap: .3rem; align-items: center; }
+  .cpill {
+    border: 1px solid var(--edge); background: none; color: var(--slate);
+    border-radius: 999px; padding: .28rem .6rem; font-size: .7rem; font-weight: 700;
+    cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .3rem;
+  }
+  .cpill i { width: 6px; height: 6px; border-radius: 50%; background: var(--cc, var(--slate-dim)); }
+  .cpill:hover { color: var(--text); border-color: var(--slate-dim); }
+  .cpill.on { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+  .spacer { flex: 0 0 auto; margin-left: auto; }
+  .upd { display: flex; align-items: center; gap: .3rem; font-family: var(--mono); font-size: .62rem; color: var(--slate-dim); white-space: nowrap; }
+  .upd i { width: 5px; height: 5px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 6px var(--emerald); animation: pulse 2s infinite; }
+  .upd.stale i { background: var(--amber, #fbbf24); box-shadow: 0 0 6px var(--amber, #fbbf24); }
+  .clock { text-align: right; line-height: 1.15; }
+  .clock-t { font-family: var(--mono); font-size: .85rem; font-weight: 600; }
+  .clock-d { font-size: .58rem; color: var(--slate-dim); text-transform: uppercase; letter-spacing: .08em; }
+
+  /* ── Detail pane ─────────────────────────────────────── */
+  main { max-width: 92rem; margin: 0 auto; padding: .8rem .9rem 3rem; }
+  #detail {
+    border: 1px solid var(--edge); border-radius: 12px; background: var(--panel);
+    min-height: 7.4rem; margin-bottom: .8rem; overflow: hidden; position: relative;
+  }
+  #detail.empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: .3rem; color: var(--slate-dim); padding: 1.6rem;
+  }
+  #detail.empty .big { font-size: .85rem; color: var(--slate); font-weight: 600; }
+  #detail.empty .sub { font-size: .68rem; letter-spacing: .04em; }
+  .d-body { display: flex; gap: 1rem; padding: .85rem 1rem; animation: rise .3s cubic-bezier(.2,.8,.25,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  .d-id { display: flex; gap: .7rem; min-width: 15rem; flex: 0 0 auto; }
+  .d-av { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; background: var(--panel-2); border: 1px solid var(--edge); }
+  .d-av-fb { width: 46px; height: 46px; border-radius: 10px; background: linear-gradient(135deg, var(--panel-2), var(--edge)); border: 1px solid var(--edge); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: var(--slate); }
+  .d-name { font-size: .95rem; font-weight: 800; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+  .d-meta { font-size: .66rem; color: var(--slate-dim); font-family: var(--mono); margin-top: .2rem; }
+  .d-desc { font-size: .7rem; color: var(--slate); margin-top: .35rem; max-width: 26rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .d-stats { display: flex; gap: 1.1rem; align-items: center; flex: 1; flex-wrap: wrap; }
+  .d-stat .v { font-family: var(--mono); font-size: .88rem; font-weight: 700; }
+  .d-stat .k { font-size: .58rem; color: var(--slate-dim); text-transform: uppercase; letter-spacing: .08em; margin-top: .15rem; }
+  .d-drop { flex: 0 0 auto; min-width: 15rem; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel-2); padding: .6rem .75rem; align-self: center; }
+  .d-drop .t { font-size: .6rem; color: var(--slate-dim); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .35rem; }
+  .d-drop .s { font-size: .75rem; font-weight: 600; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+  .d-drop .w { font-size: .66rem; color: var(--slate); font-family: var(--mono); margin-top: .25rem; }
+  .d-actions { display: flex; gap: .45rem; margin-top: .55rem; }
+  .arm-btn {
+    flex: 1; border: 1px solid rgba(32,129,226,.5); color: var(--accent);
+    background: var(--accent-soft); border-radius: 8px; padding: .4rem .8rem;
+    font-size: .72rem; font-weight: 700; cursor: pointer; transition: all .15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: .3rem; text-decoration: none;
+  }
+  .arm-btn:hover:not(:disabled) { background: rgba(32,129,226,.25); }
+  .arm-btn.armed { border-color: rgba(52,211,153,.5); color: var(--emerald); background: rgba(52,211,153,.1); cursor: default; }
+  .os-btn { border: 1px solid var(--edge); color: var(--slate); background: none; }
+  .os-btn:hover { color: var(--text); border-color: var(--slate-dim); }
+
+  /* ── Columns ─────────────────────────────────────────── */
+  .board { display: grid; grid-template-columns: 1fr 1.2fr 1.4fr; gap: .8rem; }
+  @media (max-width: 1100px) { .board { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 720px) { .board { grid-template-columns: 1fr; } .d-body { flex-direction: column; } }
+  .col { border: 1px solid var(--edge); border-radius: 12px; background: var(--panel); overflow: hidden; display: flex; flex-direction: column; }
+  .col-head {
+    display: flex; align-items: center; gap: .5rem; padding: .5rem .7rem;
+    border-bottom: 1px solid var(--edge-soft); background: var(--panel-2);
+    position: sticky; top: 0;
+  }
+  .col-title { font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .col-count { font-size: .62rem; color: var(--slate-dim); font-family: var(--mono); }
+  .pills { display: flex; gap: .25rem; margin-left: auto; }
+  .pill {
+    border: none; background: none; color: var(--slate-dim); font-size: .62rem;
+    font-weight: 700; padding: .16rem .42rem; border-radius: 6px; cursor: pointer; transition: all .12s;
+    font-family: var(--mono);
+  }
+  .pill:hover { color: var(--text); }
+  .pill.on { color: var(--emerald); background: rgba(52,211,153,.12); }
+  .col-body { overflow-y: auto; max-height: 34rem; flex: 1; }
+  .col-body.busy { opacity: .45; pointer-events: none; transition: opacity .2s; }
+
+  /* rows */
+  .row {
+    display: flex; align-items: center; gap: .55rem; padding: .34rem .7rem;
+    cursor: pointer; border-bottom: 1px solid rgba(29,37,49,.35);
+    transition: background .12s; animation: rowin .3s cubic-bezier(.2,.8,.25,1) both;
+    animation-delay: calc(var(--i) * 22ms); position: relative;
+  }
+  @keyframes rowin { from { opacity: 0; transform: translateX(-6px); } }
+  .row:hover { background: rgba(255,255,255,.035); }
+  .row.sel { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+  .rank { width: 1.3rem; text-align: right; font-family: var(--mono); font-size: .66rem; color: var(--slate-dim); flex: 0 0 auto; }
+  .av { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; background: var(--panel-2); flex: 0 0 auto; }
+  .av-fb { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--panel-2), var(--edge)); display: flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 800; color: var(--slate); flex: 0 0 auto; }
+  .row-main { min-width: 0; flex: 1; }
+  .row-name { font-size: .76rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: .3rem; }
+  .row-name.gold { color: var(--gold); }
+  .row-sub { font-size: .62rem; color: var(--slate-dim); font-family: var(--mono); display: flex; align-items: center; gap: .3rem; margin-top: .1rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .cdot { width: 5px; height: 5px; border-radius: 50%; background: var(--cc, var(--slate-dim)); flex: 0 0 auto; display: inline-block; }
+  .row-num { text-align: right; font-family: var(--mono); font-size: .72rem; flex: 0 0 auto; }
+  .row-num .lbl { display: block; font-size: .56rem; color: var(--slate-dim); }
+
+  .pct { font-family: var(--mono); font-weight: 700; font-size: .7rem; }
+  .pct.up { color: var(--emerald); }
+  .pct.dn { color: var(--red); }
+  .pct.flat { color: var(--slate-dim); }
+
+  .tag { font-size: .52rem; font-weight: 800; letter-spacing: .06em; padding: .1rem .3rem; border-radius: 4px; flex: 0 0 auto; }
+  .tag.live { background: rgba(52,211,153,.16); color: var(--emerald); animation: pulse 1.6s infinite; }
+  .tag.next { background: var(--accent-soft); color: var(--accent); }
+  .tag.new { background: rgba(240,185,11,.14); color: var(--gold); }
+  .tag.hot { background: rgba(249,115,22,.16); color: #fb923c; animation: pulse 1.2s infinite; }
+  .tag.armed { background: rgba(52,211,153,.1); color: var(--emerald); border: 1px solid rgba(52,211,153,.3); }
+  .vd { color: var(--accent); font-size: .62rem; flex: 0 0 auto; }
+
+  /* market table */
+  .mhead { display: grid; grid-template-columns: 1fr 4.2rem 4.6rem 3rem; gap: .3rem; padding: .3rem .7rem; font-size: .56rem; color: var(--slate-dim); text-transform: uppercase; letter-spacing: .07em; border-bottom: 1px solid var(--edge-soft); background: var(--panel); }
+  .mrow {
+    display: grid; grid-template-columns: 1fr 4.2rem 4.6rem 3rem; gap: .3rem;
+    align-items: center; padding: .3rem .7rem; cursor: pointer;
+    border-bottom: 1px solid rgba(29,37,49,.35); transition: background .12s;
+    animation: rowin .3s cubic-bezier(.2,.8,.25,1) both; animation-delay: calc(var(--i) * 18ms);
+  }
+  .mrow:hover { background: rgba(255,255,255,.035); }
+  .mrow.sel { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+  .mrow .cell { font-family: var(--mono); font-size: .7rem; text-align: right; }
+  .mrow .cell.sales { color: var(--slate); }
+  .flash-up { animation: fup .8s; }
+  .flash-dn { animation: fdn .8s; }
+  @keyframes fup { 0% { color: var(--emerald); text-shadow: 0 0 10px rgba(52,211,153,.7); } }
+  @keyframes fdn { 0% { color: var(--red); text-shadow: 0 0 10px rgba(248,113,113,.7); } }
+
+  .empty-msg { padding: 1.4rem; text-align: center; color: var(--slate-dim); font-size: .72rem; }
+  .skel { display: flex; align-items: center; gap: .55rem; padding: .42rem .7rem; }
+  .skel .b { height: 22px; width: 22px; border-radius: 6px; }
+  .skel .l { height: 9px; border-radius: 4px; flex: 1; }
+  .shimmer { background: linear-gradient(90deg, var(--panel-2) 25%, var(--edge) 50%, var(--panel-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* toast */
+  #toasts { position: fixed; bottom: 1.2rem; right: 1.2rem; z-index: 100; display: flex; flex-direction: column; gap: .5rem; }
+  .toast { background: var(--panel-2); border: 1px solid var(--edge); border-left: 3px solid var(--accent); border-radius: 10px; padding: .6rem .9rem; font-size: .76rem; max-width: 22rem; box-shadow: 0 10px 40px rgba(0,0,0,.5); animation: toastin .3s cubic-bezier(.2,.8,.25,1); }
+  .toast.ok { border-left-color: var(--emerald); }
+  .toast.err { border-left-color: var(--red); }
+  @keyframes toastin { from { opacity: 0; transform: translateX(20px); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="dot"></span>ACO&nbsp;<span>terminal</span></div>
+  <button class="navbtn hot" id="btn-upcoming" title="Jump to new & upcoming mints">▲ Upcoming</button>
+  <div class="search">
+    <input id="q" type="text" placeholder="name, slug or opensea link…" autocomplete="off" spellcheck="false" />
+    <div class="search-results" id="q-results"></div>
+  </div>
+  <div class="chains" id="chains"></div>
+  <div class="spacer"></div>
+  <div class="upd" id="upd"><i></i><span id="upd-t">—</span></div>
+  <a class="navbtn" href="/">◈ Dashboard</a>
+  <div class="clock"><div class="clock-t" id="clock-t">--:--:--</div><div class="clock-d" id="clock-d"></div></div>
+</header>
+
+<main>
+  <section id="detail" class="empty">
+    <div class="big">Select a project to view details</div>
+    <div class="sub">collection · market stats · drop · one-click arm</div>
+  </section>
+
+  <section class="board">
+    <div class="col">
+      <div class="col-head">
+        <span class="col-title">Trending</span><span class="col-count" id="c-trend"></span>
+        <div class="pills" id="pills-order">
+          <button class="pill" data-o="one_day_volume">24h</button>
+          <button class="pill on" data-o="seven_day_volume">7d</button>
+          <button class="pill" data-o="thirty_day_volume">30d</button>
+          <button class="pill" data-o="market_cap">top</button>
+        </div>
+      </div>
+      <div class="col-body" id="col-trend"></div>
+    </div>
+
+    <div class="col" id="col-new-wrap">
+      <div class="col-head">
+        <span class="col-title">New Mints</span><span class="col-count" id="c-new"></span>
+      </div>
+      <div class="col-body" id="col-new"></div>
+    </div>
+
+    <div class="col">
+      <div class="col-head">
+        <span class="col-title">Market</span><span class="col-count" id="c-mkt"></span>
+        <div class="pills" id="pills-mkt">
+          <button class="pill on" data-i="one_day">1d</button>
+          <button class="pill" data-i="seven_day">7d</button>
+        </div>
+      </div>
+      <div class="col-body" id="col-mkt"></div>
+    </div>
+  </section>
+</main>
+
+<div id="toasts"></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const state = {
+  board: null,
+  order: "seven_day_volume",
+  chain: "all",
+  mktInterval: "one_day",
+  selected: null,
+  prev: new Map(), // slug -> {floor, vol}
+};
+
+/* ── chain colors ─────────────────────────────────────── */
+const CHAIN_COLOR = {
+  ethereum: "#627eea", robinhood: "#00e065", arc: "#37c5f0", ink: "#a06bff",
+  base: "#0052ff", polygon: "#8247e5", solana: "#9945ff", abstract: "#7dffce",
+  avalanche: "#e84142", arbitrum: "#28a0f0", optimism: "#ff0420", bsc: "#f0b90b",
+  blast: "#fcfc03", ape_chain: "#0052f2", sei: "#9e1f19", monad: "#836ef9",
+  shape: "#5eead4", somnia: "#ff7ad9", zora: "#909090", flow: "#00ef8b",
+};
+const chainColor = (c) => CHAIN_COLOR[c] || "#5b6b80";
+
+/* ── formatters ───────────────────────────────────────── */
+function fmtVol(v) {
+  if (v == null) return "—";
+  if (v >= 10000) return (v / 1000).toFixed(0) + "K";
+  if (v >= 1000) return (v / 1000).toFixed(1) + "K";
+  if (v >= 100) return v.toFixed(1);
+  if (v >= 1) return v.toFixed(2);
+  if (v > 0) return v.toFixed(4);
+  return "0";
+}
+function fmtSales(n) { return n == null ? "—" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n); }
+function pctCls(p) { return p > 0 ? "up" : p < 0 ? "dn" : "flat"; }
+function fmtPct(p) {
+  if (p == null) return `<span class="pct flat">·</span>`;
+  return `<span class="pct ${pctCls(p)}">${p > 0 ? "+" : ""}${p.toFixed(1)}%</span>`;
+}
+function weiToEth(w) {
+  try { const n = Number(BigInt(w)) / 1e18; return n < 0.0001 && n > 0 ? n.toExponential(1) : n.toFixed(4).replace(/\.?0+$/, ""); }
+  catch { return "0"; }
+}
+function stagePrice(s) {
+  if (!s) return "—";
+  const w = s.price_wei ?? "0";
+  return w === "0" ? "FREE" : weiToEth(w) + "Ξ";
+}
+function fmtClock(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+function fmtCountdown(iso) {
+  if (!iso) return "";
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return "live";
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  if (d > 0) return `${d}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${m % 60}m`;
+  if (m > 0) return `${m}m`;
+  return `${Math.floor(ms / 1000)}s`;
+}
+function fmtAgo(ts) {
+  if (!ts) return "";
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+/* ── avatar ───────────────────────────────────────────── */
+function av(c, cls = "av") {
+  if (c.image) return `<img class="${cls}" src="${esc(c.image)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;${cls}-fb&quot;>${esc((c.name || "?")[0].toUpperCase())}</div>'">`;
+  return `<div class="${cls}-fb">${esc((c.name || "?")[0].toUpperCase())}</div>`;
+}
+const vMark = (c) => c.safelist === "verified" ? `<span class="vd">✓</span>` : "";
+const cDot = (c) => c.chain ? `<i class="cdot" style="--cc:${chainColor(c.chain)}"></i><span>${esc(c.chain)}</span>` : "";
+const armedTag = (c) => c.armed ? `<span class="tag armed">ARMED</span>` : "";
+
+/* ── rows ─────────────────────────────────────────────── */
+function trendRow(c, i) {
+  const delta = c.floor_delta_pct;
+  const right = delta != null
+    ? fmtPct(delta)
+    : c.vol_1d != null ? `<span class="pct flat">${fmtVol(c.vol_1d)}Ξ</span>` : `<span class="pct flat">·</span>`;
+  return `<div class="row ${state.selected === c.slug ? "sel" : ""}" style="--i:${i}" onclick="select('${esc(c.slug)}')">
+    <span class="rank">${i + 1}</span>
+    ${av(c)}
+    <div class="row-main">
+      <div class="row-name ${c.safelist === "verified" ? "gold" : ""}">${esc(c.name)} ${vMark(c)} ${armedTag(c)}</div>
+      <div class="row-sub">${cDot(c)}${c.has_drop ? `<span class="tag live">DROP</span>` : ""}</div>
+    </div>
+    <div class="row-num">${right}</div>
+  </div>`;
+}
+
+function newMintRow(c, i, meta) {
+  return `<div class="row ${state.selected === c.slug ? "sel" : ""}" style="--i:${i}" onclick="select('${esc(c.slug)}')">
+    ${av(c)}
+    <div class="row-main">
+      <div class="row-name ${c.safelist === "verified" ? "gold" : ""}">${esc(c.name)} ${vMark(c)} ${armedTag(c)} ${meta.tag || ""}</div>
+      <div class="row-sub">${meta.sub}</div>
+    </div>
+    <div class="row-num">${meta.right || ""}</div>
+  </div>`;
+}
+
+function marketHead() {
+  const iv = state.mktInterval === "one_day" ? "24H" : "7D";
+  return `<div class="mhead"><span>project</span><span style="text-align:right">vol ${iv}</span><span style="text-align:right">floor</span><span style="text-align:right">sales</span></div>`;
+}
+function marketRow(c, i) {
+  const vol = state.mktInterval === "one_day" ? c.vol_1d : c.vol_7d;
+  const prev = state.prev.get(c.slug);
+  const fCls = prev && prev.floor != null && c.floor != null && c.floor !== prev.floor
+    ? (c.floor > prev.floor ? "flash-up" : "flash-dn") : "";
+  const vCls = prev && prev.vol_1d != null && vol != null && vol !== prev.vol_1d
+    ? (vol > prev.vol_1d ? "flash-up" : "flash-dn") : "";
+  return `<div class="mrow ${state.selected === c.slug ? "sel" : ""}" style="--i:${i}" onclick="select('${esc(c.slug)}')">
+    <div class="row-main" style="display:flex;align-items:center;gap:.45rem">
+      ${av(c)}
+      <div style="min-width:0">
+        <div class="row-name ${c.safelist === "verified" ? "gold" : ""}">${esc(c.name)} ${vMark(c)} ${armedTag(c)}</div>
+        <div class="row-sub">${cDot(c)}</div>
+      </div>
+    </div>
+    <div class="cell ${vCls}">${fmtVol(vol)}</div>
+    <div class="cell ${fCls}">${c.floor != null ? c.floor : "—"}<div style="font-size:.56rem">${c.floor_delta_pct != null ? fmtPct(c.floor_delta_pct) : ""}</div></div>
+    <div class="cell sales">${fmtSales(c.sales_1d)}</div>
+  </div>`;
+}
+
+function skeletons(n) {
+  return Array.from({ length: n }, () =>
+    `<div class="skel"><div class="b shimmer"></div><div class="l shimmer"></div><div class="l shimmer" style="max-width:3rem"></div></div>`).join("");
+}
+
+/* ── render board ─────────────────────────────────────── */
+function render() {
+  const b = state.board;
+  if (!b) return;
+  // Trending
+  $("#c-trend").textContent = b.market.length;
+  $("#col-trend").innerHTML = b.market.length
+    ? b.market.map(trendRow).join("")
+    : `<div class="empty-msg">no collections</div>`;
+  // New mints — live/upcoming drops first, then fresh collections
+  const dropRows = (b.drops || []).map((d, i) => {
+    const st = d.active_stage || d.next_stage;
+    const vel = d.mints_per_min > 0 ? `<span class="tag hot">+${d.mints_per_min}/min</span>` : "";
+    const tag = d.is_minting ? `<span class="tag live">LIVE</span>${vel}` : st ? `<span class="tag next">DROP</span>` : "";
+    const when = st?.start_time ? `${fmtClock(st.start_time)} · <span class="cd" data-t="${esc(st.start_time)}">${fmtCountdown(st.start_time)}</span>` : "";
+    return newMintRow(d, i, {
+      tag,
+      sub: `${stagePrice(st)}${when ? " · " + when : ""} · ${esc(d.chain || "")}`,
+      right: d.total_supply != null && d.max_supply ? `<span class="pct flat">${d.total_supply}/${d.max_supply}</span>` : "",
+    });
+  });
+  const newRows = (b.new_mints || []).map((c, i) =>
+    newMintRow(c, dropRows.length + i, {
+      tag: `<span class="tag new">NEW</span>${c.has_drop ? `<span class="tag live">DROP</span>` : ""}`,
+      sub: `${cDot(c) || "fresh listing"}${c.first_seen ? ` · <span class="ago" data-t="${c.first_seen}">${fmtAgo(c.first_seen)}</span>` : ""}`,
+    }));
+  $("#c-new").textContent = dropRows.length + newRows.length;
+  $("#col-new").innerHTML = dropRows.length + newRows.length
+    ? dropRows.join("") + newRows.join("")
+    : `<div class="empty-msg">nothing new</div>`;
+  // Market
+  $("#c-mkt").textContent = b.market.length;
+  $("#col-mkt").innerHTML = marketHead() + b.market.map(marketRow).join("");
+}
+
+/* ── data ─────────────────────────────────────────────── */
+async function loadBoard(silent) {
+  const cols = ["#col-trend", "#col-new", "#col-mkt"];
+  if (!silent) cols.forEach((c) => { const el = $(c); if (!el.innerHTML.trim() || el.dataset.busy) el.innerHTML = skeletons(12); });
+  try {
+    const res = await fetch(`/api/drops/board?order=${state.order}&chain=${state.chain}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    // snapshot prev values for flash animations
+    if (state.board) {
+      state.prev = new Map(state.board.market.map((c) => [c.slug, { floor: c.floor, vol_1d: c.vol_1d }]));
+    }
+    state.board = data;
+    state.fetchedAt = data.fetched_at || Date.now();
+    render();
+    setTimeout(() => { state.prev = new Map(); }, 1200);
+  } catch (e) {
+    if (!state.board) {
+      cols.forEach((c) => { $(c).innerHTML = `<div class="empty-msg">board failed — ${esc(e.message)}</div>`; });
+    }
+  }
+}
+
+/* ── detail pane ──────────────────────────────────────── */
+async function select(slug) {
+  state.selected = slug;
+  render();
+  const el = $("#detail");
+  el.className = "";
+  el.innerHTML = `<div class="d-body"><div class="skel" style="flex:1"><div class="b shimmer" style="width:46px;height:46px"></div><div style="flex:1"><div class="l shimmer" style="width:40%"></div><div class="l shimmer" style="width:70%;margin-top:.4rem"></div></div></div></div>`;
+  try {
+    const res = await fetch(`/api/drops/lookup/${encodeURIComponent(slug)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (state.selected === slug) renderDetail(data);
+  } catch (e) {
+    if (state.selected === slug) {
+      el.className = "empty";
+      el.innerHTML = `<div class="big">lookup failed</div><div class="sub">${esc(e.message)}</div>`;
+    }
+  }
+}
+
+function statCell(v, k) {
+  return `<div class="d-stat"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+}
+
+function stageLine(card, snap) {
+  const stages = snap?.stages?.length ? snap.stages : card.stages || [];
+  if (!stages.length) return "";
+  const cur = snap?.activeStage || snap?.nextStage || stages.find((s) => (s.raw || s).start_time || (s.raw || s).startTime);
+  if (!cur) return "";
+  const raw = cur.raw || cur;
+  const price = cur.priceWei ?? raw.price_wei ?? raw.price ?? "0";
+  const start = cur.startTime ? new Date(cur.startTime).toISOString() : raw.start_time;
+  const p = price === "0" ? "FREE" : `${weiToEth(price)}Ξ`;
+  const cd = start ? ` · <span class="cd" data-t="${esc(start)}">${fmtCountdown(start)}</span>` : "";
+  return `<div class="s">${esc(raw.label || raw.stage_type || cur.label || cur.type || "stage")} · <b>${p}</b>${cd}</div>
+    <div class="w">${start ? `starts ${fmtClock(start)}` : ""}${raw.max_per_stage || cur.maxPerStage ? ` · stage cap ${raw.max_per_stage ?? cur.maxPerStage}` : ""}${(raw.max_per_wallet ?? cur.maxPerWallet) ? ` · max ${raw.max_per_wallet ?? cur.maxPerWallet}/wallet` : ""}</div>`;
+}
+
+function renderDetail({ kind, card: d, snapshot: snap, collection, stats }) {
+  const el = $("#detail");
+  const img = d.image || collection?.image;
+  const name = d.name || collection?.name || d.slug;
+  const chain = d.chain || collection?.chain;
+  const isDrop = kind === "drop" && snap;
+  const st = stats || {};
+  const iv1 = st.intervals?.one_day || {};
+  const iv7 = st.intervals?.seven_day || {};
+  const minted = snap?.totalSupply ?? d.total_supply;
+  const supply = snap?.maxSupply ?? d.max_supply;
+  const statHtml = isDrop
+    ? statCell(minted != null && supply ? `${minted}/${supply}` : (minted ?? "—"), "minted")
+      + statCell(st.floor_price != null ? `${st.floor_price}` : "—", "floor")
+      + statCell(fmtVol(iv1.volume), "24h vol")
+      + statCell(fmtSales(iv1.sales), "24h sales")
+    : statCell(st.floor_price != null ? `${st.floor_price}` : "—", "floor")
+      + statCell(fmtVol(iv1.volume), "24h vol")
+      + statCell(fmtVol(iv7.volume), "7d vol")
+      + statCell(fmtSales(iv1.sales), "24h sales")
+      + statCell(st.num_owners != null ? fmtSales(st.num_owners) : "—", "owners");
+  el.innerHTML = `<div class="d-body">
+    <div class="d-id">
+      ${img ? `<img class="d-av" src="${esc(img)}" onerror="this.outerHTML='<div class=&quot;d-av-fb&quot;>${esc((name || "?")[0].toUpperCase())}</div>'">` : `<div class="d-av-fb">${esc((name || "?")[0].toUpperCase())}</div>`}
+      <div>
+        <div class="d-name">${esc(name)}
+          ${d.safelist === "verified" || collection?.safelist === "verified" ? `<span class="vd">✓ verified</span>` : ""}
+          ${d.armed ? `<span class="tag armed">ARMED</span>` : ""}
+          ${d.is_minting ? `<span class="tag live">LIVE</span>` : ""}
+        </div>
+        <div class="d-meta">${esc(d.slug)}${chain ? ` · ` : ""}${chain ? `<i class="cdot" style="--cc:${chainColor(chain)}"></i>${esc(chain)}` : ""}${d.category || collection?.category ? ` · ${esc(d.category || collection?.category)}` : ""}</div>
+        ${(d.description || collection?.description) ? `<div class="d-desc">${esc(String(d.description || collection?.description).slice(0, 220))}</div>` : ""}
+      </div>
+    </div>
+    <div class="d-stats">${statHtml}</div>
+    <div class="d-drop">
+      <div class="t">${isDrop ? "drop" : "collection"}</div>
+      ${isDrop ? stageLine(d, snap) : `<div class="s" style="color:var(--slate)">no scheduled drop</div>`}
+      <div class="d-actions">
+        ${isDrop
+          ? (d.armed
+              ? `<button class="arm-btn armed" disabled>✓ Armed — fires at stage start</button>`
+              : `<button class="arm-btn" onclick="event.stopPropagation();arm('${esc(d.slug)}',this)">⚡ Arm bot</button>`)
+          : ""}
+        <a class="arm-btn os-btn" href="${esc(d.opensea_url || `https://opensea.io/collection/${d.slug}`)}" target="_blank" rel="noopener">OpenSea ↗</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── arm ──────────────────────────────────────────────── */
+async function arm(slug, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "Arming…"; }
+  try {
+    const res = await fetch("/api/strategies", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ collection: slug, wallet: "all" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    const n = data.count ?? 1;
+    toast(`⚡ armed "${slug}" for ${n} wallet${n > 1 ? "s" : ""} — the snipe auto-fires at stage start`, "ok");
+    if (state.board) {
+      [...state.board.market, ...state.board.new_mints, ...state.board.drops].forEach((c) => {
+        if (c.slug === slug) c.armed = true;
+      });
+      render();
+    }
+    if (state.selected === slug) select(slug);
+  } catch (e) {
+    toast(`arm failed: ${e.message}`, "err");
+    if (btn) { btn.disabled = false; btn.innerHTML = "⚡ Arm bot"; }
+  }
+}
+
+/* ── toast ────────────────────────────────────────────── */
+function toast(msg, kind) {
+  const t = document.createElement("div");
+  t.className = `toast ${kind || ""}`;
+  t.textContent = msg;
+  $("#toasts").appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .3s"; setTimeout(() => t.remove(), 350); }, 4200);
+}
+
+/* ── search ───────────────────────────────────────────── */
+let qTimer;
+$("#q").addEventListener("input", (e) => {
+  clearTimeout(qTimer);
+  const q = e.target.value.trim();
+  if (q.length < 2) { $("#q-results").classList.remove("open"); return; }
+  qTimer = setTimeout(() => runSearch(q), 280);
+});
+$("#q").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const q = e.target.value.trim();
+    if (/^https?:\/\//i.test(q) || /^[a-z0-9]+([-_][a-z0-9]+)*$/i.test(q)) {
+      $("#q-results").classList.remove("open");
+      select(q);
+    }
+  }
+  if (e.key === "Escape") $("#q-results").classList.remove("open");
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".search")) $("#q-results").classList.remove("open");
+});
+
+async function runSearch(q) {
+  const box = $("#q-results");
+  box.classList.add("open");
+  box.innerHTML = `<div class="sr-empty">searching…</div>`;
+  try {
+    const res = await fetch(`/api/drops/search/${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    const results = data.results || [];
+    if (!results.length) {
+      box.innerHTML = `<div class="sr-empty">no collections matched "${esc(q)}"</div>`;
+      return;
+    }
+    box.innerHTML = results.map((c) => `
+      <div class="sr-row" onclick="pickSearch('${esc(c.slug)}')">
+        ${av(c)}
+        <div style="min-width:0">
+          <div class="sr-name ${c.safelist === "verified" ? "gold" : ""}">${esc(c.name)} ${vMark(c)} ${armedTag(c)}</div>
+          <div class="sr-sub">${esc(c.slug)}${c.chain ? ` · ${esc(c.chain)}` : ""}</div>
+        </div>
+        <div style="margin-left:auto">${c.is_minting ? `<span class="tag live">LIVE</span>` : c.has_drop ? `<span class="tag next">DROP</span>` : ""}</div>
+      </div>`).join("");
+  } catch (e) {
+    box.innerHTML = `<div class="sr-empty">search failed — ${esc(e.message)}</div>`;
+  }
+}
+function pickSearch(slug) {
+  $("#q-results").classList.remove("open");
+  $("#q").value = "";
+  select(slug);
+}
+
+/* ── pills ────────────────────────────────────────────── */
+$("#pills-order").addEventListener("click", (e) => {
+  const b = e.target.closest(".pill");
+  if (!b) return;
+  document.querySelectorAll("#pills-order .pill").forEach((p) => p.classList.toggle("on", p === b));
+  state.order = b.dataset.o;
+  loadBoard();
+});
+$("#pills-mkt").addEventListener("click", (e) => {
+  const b = e.target.closest(".pill");
+  if (!b) return;
+  document.querySelectorAll("#pills-mkt .pill").forEach((p) => p.classList.toggle("on", p === b));
+  state.mktInterval = b.dataset.i;
+  render();
+});
+const KNOWN_CHAINS = ["robinhood", "arc", "ethereum", "ink", "base"];
+function renderChains() {
+  const seen = new Set(KNOWN_CHAINS);
+  if (state.board) {
+    [...state.board.market, ...state.board.new_mints, ...state.board.drops].forEach((c) => c.chain && seen.add(c.chain));
+  }
+  const pills = [`<button class="cpill ${state.chain === "all" ? "on" : ""}" data-c="all">ALL</button>`]
+    .concat([...seen].map((c) =>
+      `<button class="cpill ${state.chain === c ? "on" : ""}" data-c="${esc(c)}"><i style="--cc:${chainColor(c)}"></i>${esc(c.slice(0, 4).toUpperCase())}</button>`));
+  $("#chains").innerHTML = pills.join("");
+}
+$("#chains").addEventListener("click", (e) => {
+  const b = e.target.closest(".cpill");
+  if (!b) return;
+  state.chain = b.dataset.c;
+  renderChains();
+  loadBoard();
+});
+$("#btn-upcoming").addEventListener("click", () => {
+  $("#col-new-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("#col-new-wrap").animate([{ boxShadow: "0 0 0 2px rgba(32,129,226,.8)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 900 });
+});
+
+/* ── clock + countdown ticker ─────────────────────────── */
+function tick() {
+  const now = new Date();
+  $("#clock-t").textContent = now.toLocaleTimeString([], { hour12: false });
+  $("#clock-d").textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  document.querySelectorAll(".cd[data-t]").forEach((el) => {
+    el.textContent = fmtCountdown(el.dataset.t);
+  });
+  document.querySelectorAll(".ago[data-t]").forEach((el) => {
+    el.textContent = fmtAgo(Number(el.dataset.t));
+  });
+  if (state.fetchedAt) {
+    const ago = Math.max(0, Math.round((Date.now() - state.fetchedAt) / 1000));
+    $("#upd-t").textContent = ago < 2 ? "live" : `updated ${ago}s ago`;
+    $("#upd").classList.toggle("stale", ago > 45);
+  }
+}
+setInterval(tick, 1000);
+tick();
+
+/* ── boot ─────────────────────────────────────────────── */
+renderChains();
+loadBoard();
+setInterval(() => loadBoard(true), 20_000);
+</script>
+</body>
+</html>

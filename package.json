@@ -1,0 +1,28 @@
+{
+  "name": "opensea-aco",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenSea ACO (Automated Checkout) bot — low-latency NFT drop minting via the official OpenSea API",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @aco/api",
+    "start": "npm run start --workspace @aco/api",
+    "dev:api": "npm run dev --workspace @aco/api",
+    "dev:dashboard": "npm run dev --workspace @aco/dashboard",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
